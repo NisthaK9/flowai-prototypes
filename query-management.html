@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flow AI – Query Management</title>
+<meta name="description" content="FlowAI Query Management — interactive prototype by Nistha Kaushal.">
+<meta name="robots" content="noindex">
+</head>
+<body>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --teal:#007f99;--teal-dark:#00464c;--teal-ink:#124e5d;--lime:#c8f050;
+  --text:rgba(0,0,0,.85);--muted:#999;--muted-2:#4a4a4a;
+  --bg:#f5f7f8;--card:#fff;--border:#e6e8ea;--border-2:#d9dde0;
+  --chip:#f0f3f5;--chip-active:#e1f1f4;
+  --danger:#e4572e;--warn:#f6a623;--success:#3fae4a;
+  --orange-bg:#f5b556;--link:#1f87a0;
+  --autofill:#edfaf3;--autofill-border:#7ed4aa;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:'Lato',sans-serif;font-size:14px;height:100vh;overflow:hidden}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+a{color:var(--link);text-decoration:none}
+input,select,textarea{font-family:inherit;font-size:14px}
+
+/* ── Layout ── */
+.app{display:grid;grid-template-columns:96px 1fr;height:100vh;overflow:hidden}
+.right-pane{display:flex;flex-direction:column;height:100vh;overflow:hidden;min-width:0}
+
+/* ── Sidebar ── */
+.sidebar{background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;padding:18px 0 100px;position:relative;z-index:30;grid-row:1/-1;height:100vh;overflow-y:auto}
+.logo{display:flex;align-items:center;justify-content:center;gap:4px;padding:0 12px 22px;font-weight:900;font-size:18px}
+.logo .flow{color:#1a1a1a}
+.logo .ai{background:var(--lime);color:#1a1a1a;padding:2px 6px;border-radius:4px;font-size:14px;font-weight:900;letter-spacing:1px}
+.nav{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.nav-item{display:flex;flex-direction:column;align-items:center;padding:14px 10px;color:var(--muted);font-weight:400;text-align:center;line-height:1.2;gap:6px;border-left:3px solid transparent;cursor:pointer;font-size:12px}
+.nav-item svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav-item:hover{color:var(--teal-dark)}
+.nav-item.active{color:var(--teal-dark);font-weight:700;background:#eaf6f8;border-left-color:var(--teal)}
+.nav-icon-wrap{position:relative;display:inline-flex}
+.nav-badge{position:absolute;top:-6px;right:-10px;background:var(--danger);color:#fff;font-size:9px;font-weight:900;padding:1px 5px;border-radius:8px;min-width:16px;text-align:center;line-height:14px}
+
+/* ── Topbar ── */
+.topbar{flex-shrink:0;display:flex;align-items:center;padding:14px 28px;background:var(--bg);gap:16px;border-bottom:1px solid var(--border)}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.topbar-crumb{color:var(--muted);font-size:13px}
+.topbar-crumb span{font-weight:700;color:var(--text)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--lime);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;color:#1a1a1a}
+.notif-btn{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;border:1px solid var(--border)}
+.notif-btn:hover{background:#f0f3f5}
+.notif-btn svg{width:18px;height:18px;stroke:#666;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.notif-dot{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--danger);border:2px solid #fff}
+
+/* ── Main ── */
+.main{flex:1;padding:0;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── Page views ── */
+.qm-view{display:none;flex-direction:column;height:100%;overflow:hidden}
+.qm-view.active{display:flex}
+
+/* ── Queries header ── */
+.qm-header{flex-shrink:0;padding:20px 28px 0;display:flex;flex-direction:column;gap:16px}
+.qm-title-row{display:flex;align-items:center;justify-content:space-between}
+.qm-title-row h1{font-size:22px;font-weight:900;color:#1a1a2e;margin:0}
+.qm-title-actions{display:flex;gap:10px}
+
+/* ── Stats strip ── */
+.qm-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;padding:0 28px;flex-shrink:0}
+.qs-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;transition:box-shadow .15s,border-color .15s,transform .15s}
+.qs-card:hover{border-color:var(--border-2);box-shadow:0 6px 18px rgba(20,40,60,.06);transform:translateY(-1px)}
+.qs-card.breached{background:#fffaf8;border-color:#f4d8ce}
+.qs-ic{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center}
+.qs-ic svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.qs-card.open .qs-ic{background:#e1f1f4;color:var(--teal)}
+.qs-card.pending .qs-ic{background:#fff3e0;color:#9a5c00}
+.qs-card.breached .qs-ic{background:#fce8e3;color:var(--danger)}
+.qs-card.resolved .qs-ic{background:#e6f7eb;color:var(--success)}
+.qs-card.total .qs-ic{background:#efe8fc;color:#6a3cb3}
+.qs-num{font-size:28px;font-weight:900;color:#1a1a2e;line-height:1}
+.qs-label{font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-top:5px}
+.qs-delta{font-size:11px;font-weight:700;margin-top:8px;display:flex;align-items:center;gap:3px}
+.qs-delta.up{color:var(--danger)}.qs-delta.down{color:var(--success)}
+.qs-delta svg{width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2.5}
+
+/* ── Tab bar + filters ── */
+.qm-tabs{display:flex;align-items:center;border-bottom:1px solid var(--border);padding:0 28px;flex-shrink:0;background:#fff;margin-top:12px}
+.qm-tab{padding:10px 18px;font-size:13px;font-weight:700;color:#aaa;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s}
+.qm-tab:hover{color:var(--teal-dark)}
+.qm-tab.active{color:var(--teal-dark);border-bottom-color:var(--teal)}
+.qm-tab .tab-count{background:var(--chip);padding:1px 7px;border-radius:10px;font-size:11px;margin-left:5px;color:#666}
+.qm-tab.active .tab-count{background:var(--chip-active);color:var(--teal-dark)}
+.qm-filters{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:6px;font-weight:700;font-size:14px;border:1px solid transparent;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn-primary{background:var(--teal-dark);color:#fff;border-color:var(--teal-dark)}
+.btn-primary:hover{background:var(--teal-ink)}
+.btn-teal{background:var(--teal);color:#fff}
+.btn-teal:hover{background:var(--teal-dark)}
+.btn-outline{background:#fff;border-color:var(--border-2);color:var(--text)}
+.btn-outline:hover{background:#f5f7f8}
+.btn-ghost{background:transparent;color:var(--link);border-color:transparent}
+.btn-ghost:hover{background:#eaf6f8}
+.btn-danger{background:#fff;border-color:#e4572e;color:#e4572e}
+.btn-sm{padding:6px 12px;font-size:13px}
+.btn-lg{padding:12px 24px;font-size:15px}
+.btn:disabled{opacity:.38;cursor:not-allowed;pointer-events:none}
+.btn-icon{width:34px;height:34px;padding:0;border-radius:6px;justify-content:center;flex-shrink:0;border:1px solid var(--border-2);background:#fff}
+.btn-icon:hover{background:#f5f7f8}
+
+/* ── Ticket table ── */
+.qm-table-wrap{flex:1;overflow-y:auto;padding:0 28px 28px}
+.qm-table{width:100%;border-collapse:separate;border-spacing:0;margin-top:0}
+.qm-table thead{position:sticky;top:0;z-index:5}
+.qm-table th{background:#f8f9fa;padding:10px 14px;font-size:11px;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:.5px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+.qm-table th:first-child{border-radius:8px 0 0 0}
+.qm-table th:last-child{border-radius:0 8px 0 0}
+.qm-table td{padding:12px 14px;border-bottom:1px solid #f0f2f4;background:#fff;vertical-align:middle}
+.qm-table tr:hover td{background:#fafcfd}
+.qm-table tr{cursor:pointer}
+.qm-table tr.sla-breach td{background:#fff8f6}
+.qm-table tr.sla-breach:hover td{background:#fff2ee}
+
+/* ticket id */
+.tk-id{font-weight:800;color:var(--teal-dark);font-size:13px}
+.tk-subject{font-weight:700;font-size:13px;color:#1a1a2e;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tk-student{display:flex;align-items:center;gap:8px}
+.tk-av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+.tk-sname{font-size:13px;font-weight:600;color:#333}
+
+/* ── Priority pills ── */
+.pri-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:.3px}
+.pri-pill.urgent{background:#fce8e3;color:#b33218}
+.pri-pill.high{background:#fff3e0;color:#9a5c00}
+.pri-pill.medium{background:#e8f4fc;color:#0e6fa6}
+.pri-pill.low{background:#f0f3f5;color:#666}
+.pri-pill .pri-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.pri-pill.urgent .pri-dot{background:#e4572e}
+.pri-pill.high .pri-dot{background:var(--warn)}
+.pri-pill.medium .pri-dot{background:#1f87a0}
+.pri-pill.low .pri-dot{background:#aaa}
+
+/* ── Status pills ── */
+.status-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:800}
+.status-pill.open{background:#e8f4fc;color:#0e6fa6}
+.status-pill.in-progress{background:#f0e8fc;color:#6a3cb3}
+.status-pill.awaiting{background:#fff3e0;color:#9a5c00}
+.status-pill.resolved{background:#e6f7eb;color:#2a7a50}
+.status-pill.closed{background:#f0f3f5;color:#888}
+.status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.status-pill.open .status-dot{background:#1f87a0}
+.status-pill.in-progress .status-dot{background:#6a3cb3}
+.status-pill.awaiting .status-dot{background:var(--warn)}
+.status-pill.resolved .status-dot{background:var(--success)}
+.status-pill.closed .status-dot{background:#aaa}
+
+/* ── SLA column ── */
+.sla-cell{display:flex;flex-direction:column;gap:3px}
+.sla-row{display:flex;align-items:center;gap:6px;font-size:11px}
+.sla-label{color:#aaa;font-weight:700;width:22px;flex-shrink:0}
+.sla-bar-track{flex:1;height:4px;background:#eee;border-radius:2px;overflow:hidden;min-width:50px;max-width:80px}
+.sla-bar-fill{height:100%;border-radius:2px;transition:width .3s}
+.sla-bar-fill.ok{background:var(--success)}
+.sla-bar-fill.warn{background:var(--warn)}
+.sla-bar-fill.breach{background:var(--danger)}
+.sla-time{font-weight:700;font-size:11px;white-space:nowrap}
+.sla-time.ok{color:var(--success)}
+.sla-time.warn{color:#9a5c00}
+.sla-time.breach{color:var(--danger)}
+
+/* ── Category chip ── */
+.cat-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;background:#f0f3f5;border-radius:5px;font-size:11px;font-weight:700;color:#555}
+.cat-chip svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2}
+
+/* ── Date ── */
+.tk-date{font-size:12px;color:#999}
+
+/* ══════════════════════════════════════════
+   CREATE TICKET VIEW
+   ══════════════════════════════════════════ */
+.ct-wrap{flex:1;overflow-y:auto;padding:24px 28px 80px}
+.ct-card{background:#fff;border:1px solid var(--border);border-radius:12px;max-width:780px;margin:0 auto}
+.ct-head{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.ct-head h2{font-size:17px;font-weight:900;color:#1a1a2e;margin:0;flex:1}
+.ct-head .ct-step{font-size:12px;color:var(--teal);font-weight:700}
+.ct-body{padding:24px}
+.ct-section{margin-bottom:24px}
+.ct-section:last-child{margin-bottom:0}
+.ct-section-title{font-size:13px;font-weight:800;color:var(--teal-dark);margin-bottom:14px;display:flex;align-items:center;gap:7px;padding-bottom:8px;border-bottom:1px solid #f0f2f4}
+.ct-section-title svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
+.ct-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.ct-field{display:flex;flex-direction:column;gap:5px}
+.ct-field.span-2{grid-column:span 2}
+.ct-field label{font-size:13px;font-weight:700;color:#444}
+.ct-field label .req{color:var(--danger);margin-left:2px}
+.ct-field input,.ct-field select,.ct-field textarea{width:100%;padding:10px 12px;border:1px solid var(--border-2);border-radius:6px;background:#fff;outline:none;color:var(--text);transition:border .15s}
+.ct-field input:focus,.ct-field select:focus,.ct-field textarea:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(0,127,153,.08)}
+.ct-field textarea{resize:vertical;min-height:100px}
+.ct-field .field-hint{font-size:11px;color:#aaa;margin-top:2px}
+.ct-field input.error,.ct-field select.error,.ct-field textarea.error{border-color:var(--danger);box-shadow:0 0 0 3px rgba(228,87,46,.1)}
+.ct-field .error-msg{font-size:11px;color:var(--danger);margin-top:2px;display:none}
+
+/* Student search dropdown */
+.student-search-wrap{position:relative}
+.student-dropdown{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.1);z-index:20;max-height:200px;overflow-y:auto;display:none}
+.student-dropdown.open{display:block}
+.sd-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background .1s}
+.sd-item:hover{background:#f5f7f8}
+.sd-item .sd-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+.sd-item .sd-nm{font-size:13px;font-weight:700;color:#1a1a2e}
+.sd-item .sd-em{font-size:11px;color:#999}
+
+/* SLA preview */
+.sla-preview{background:#f8fafb;border:1px solid var(--border);border-radius:8px;padding:14px 18px;display:none;gap:16px;align-items:center}
+.sla-preview.show{display:flex}
+.sla-preview-item{display:flex;flex-direction:column;gap:2px;flex:1}
+.sla-preview-label{font-size:10px;font-weight:800;color:#aaa;text-transform:uppercase;letter-spacing:.5px}
+.sla-preview-val{font-size:14px;font-weight:900;color:var(--teal-dark)}
+.sla-preview-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sla-preview-icon svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8}
+.sla-preview-icon.urgent{background:#fce8e3;color:var(--danger)}
+.sla-preview-icon.high{background:#fff3e0;color:#9a5c00}
+.sla-preview-icon.medium{background:#e8f4fc;color:var(--teal)}
+.sla-preview-icon.low{background:#f0f3f5;color:#999}
+
+/* file attach */
+.attach-zone{display:flex;align-items:center;gap:12px;padding:12px 16px;border:1px dashed var(--border-2);border-radius:8px;cursor:pointer;transition:border-color .15s}
+.attach-zone:hover{border-color:var(--teal);background:#fafcfd}
+.attach-zone svg{width:18px;height:18px;stroke:#aaa;fill:none;stroke-width:1.8}
+.attach-zone span{font-size:13px;color:#888}
+
+/* Footer */
+.ct-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:flex-end;gap:10px;background:#fafbfc;border-radius:0 0 12px 12px}
+
+/* ══════════════════════════════════════════
+   TICKET DETAIL VIEW
+   ══════════════════════════════════════════ */
+.td-wrap{flex:1;overflow-y:auto;padding:24px 28px 80px}
+.td-layout{display:grid;grid-template-columns:1fr 320px;gap:20px;max-width:1100px}
+.td-main{display:flex;flex-direction:column;gap:16px}
+.td-aside{display:flex;flex-direction:column;gap:14px}
+
+/* Ticket header card */
+.td-header-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px 24px}
+.td-top-row{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.td-id-badge{font-size:12px;font-weight:800;color:var(--teal);background:var(--chip-active);padding:3px 10px;border-radius:6px}
+.td-subject{font-size:18px;font-weight:900;color:#1a1a2e;flex:1}
+.td-meta-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding-top:14px;border-top:1px solid #f0f2f4}
+.td-meta-item{display:flex;flex-direction:column;gap:3px}
+.td-meta-label{font-size:10px;font-weight:800;color:#bbb;text-transform:uppercase;letter-spacing:.5px}
+.td-meta-val{font-size:13px;font-weight:700;color:#333}
+
+/* Description card */
+.td-desc-card{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.td-desc-head{padding:14px 20px;border-bottom:1px solid var(--border);font-size:14px;font-weight:800;color:#1a1a2e;display:flex;align-items:center;gap:8px}
+.td-desc-head svg{width:14px;height:14px;stroke:var(--teal);fill:none;stroke-width:2}
+.td-desc-body{padding:18px 20px;font-size:13px;color:#444;line-height:1.7}
+
+/* Activity timeline */
+.td-activity-card{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.td-act-head{padding:14px 20px;border-bottom:1px solid var(--border);font-size:14px;font-weight:800;color:#1a1a2e}
+.td-timeline{padding:18px 20px}
+.tl-item{display:flex;gap:12px;padding-bottom:18px;position:relative}
+.tl-item:last-child{padding-bottom:0}
+.tl-item:not(:last-child)::after{content:'';position:absolute;left:14px;top:30px;bottom:0;width:2px;background:#eee}
+.tl-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1}
+.tl-dot svg{width:12px;height:12px;stroke:#fff;fill:none;stroke-width:2.5}
+.tl-dot.created{background:var(--teal)}
+.tl-dot.response{background:#6a3cb3}
+.tl-dot.note{background:var(--warn)}
+.tl-dot.resolved{background:var(--success)}
+.tl-content{flex:1;padding-top:3px}
+.tl-text{font-size:13px;color:#444;line-height:1.5}
+.tl-text strong{color:#1a1a2e}
+.tl-time{font-size:11px;color:#bbb;margin-top:3px}
+.tl-comment-box{background:#f8f9fb;border:1px solid #eee;border-radius:8px;padding:10px 14px;margin-top:6px;font-size:13px;color:#555;line-height:1.5}
+
+/* SLA side panel */
+.td-sla-card{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.td-sla-head{padding:14px 18px;border-bottom:1px solid var(--border);font-size:14px;font-weight:800;color:#1a1a2e;display:flex;align-items:center;gap:7px}
+.td-sla-head svg{width:14px;height:14px;stroke:var(--teal);fill:none;stroke-width:2}
+.td-sla-body{padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+.sla-gauge{display:flex;flex-direction:column;gap:6px}
+.sla-gauge-header{display:flex;align-items:center;justify-content:space-between}
+.sla-gauge-label{font-size:12px;font-weight:700;color:#555}
+.sla-gauge-status{font-size:11px;font-weight:800;padding:2px 8px;border-radius:10px}
+.sla-gauge-status.ok{background:#e6f7eb;color:#2a7a50}
+.sla-gauge-status.warn{background:#fff3e0;color:#9a5c00}
+.sla-gauge-status.breach{background:#fce8e3;color:#b33218}
+.sla-gauge-bar{height:6px;background:#eee;border-radius:3px;overflow:hidden}
+.sla-gauge-fill{height:100%;border-radius:3px}
+.sla-gauge-fill.ok{background:var(--success)}
+.sla-gauge-fill.warn{background:var(--warn)}
+.sla-gauge-fill.breach{background:var(--danger)}
+.sla-gauge-meta{display:flex;justify-content:space-between;font-size:11px;color:#aaa}
+
+/* Details side panel */
+.td-details-card{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.td-det-head{padding:14px 18px;border-bottom:1px solid var(--border);font-size:14px;font-weight:800;color:#1a1a2e}
+.td-det-body{padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.td-det-row{display:flex;flex-direction:column;gap:2px}
+.td-det-label{font-size:10px;font-weight:800;color:#bbb;text-transform:uppercase;letter-spacing:.5px}
+.td-det-val{font-size:13px;font-weight:700;color:#333}
+.td-det-val.link{color:var(--teal);cursor:pointer}
+
+/* Reply box */
+.reply-box{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding-top:14px;border-top:1px solid #eee}
+.reply-input{flex:1;border:1px solid var(--border-2);border-radius:8px;padding:10px 14px;font-size:13px;outline:none;resize:none;min-height:40px;max-height:120px;font-family:inherit;transition:border .15s}
+.reply-input:focus{border-color:var(--teal)}
+.reply-send{width:36px;height:36px;border-radius:8px;background:var(--teal-dark);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;border:none}
+.reply-send:hover{background:var(--teal-ink)}
+.reply-send svg{width:15px;height:15px;stroke:#fff;fill:none;stroke-width:2}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--teal-dark);color:#fff;padding:12px 22px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:300;font-weight:700;font-size:14px;white-space:nowrap;display:flex;align-items:center;gap:8px;opacity:0;transition:all .3s ease}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round}
+
+/* ── Empty state ── */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;text-align:center}
+.empty-state svg{width:64px;height:64px;stroke:#ccc;fill:none;stroke-width:1.2;margin-bottom:16px}
+.empty-state h3{font-size:17px;font-weight:800;color:#555;margin-bottom:6px}
+.empty-state p{font-size:13px;color:#aaa;margin-bottom:20px}
+
+/* ── Animations ── */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn .25s ease forwards}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.pulse{animation:pulse 2s ease-in-out infinite}
+
+/* ══════════════════════════════════════════
+   RAISE FLOWS — chooser modal, agentic modal, guided side sheet
+   ══════════════════════════════════════════ */
+.ov{position:fixed;inset:0;background:rgba(18,28,36,.34);z-index:200;opacity:0;visibility:hidden;transition:opacity .2s}
+.ov.show{opacity:1;visibility:visible}
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-46%);z-index:210;background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 26px 64px rgba(0,0,0,.24);width:min(560px,92vw);max-height:88vh;overflow:hidden;display:flex;flex-direction:column;opacity:0;visibility:hidden;transition:opacity .22s,transform .22s}
+.modal.show{opacity:1;visibility:visible;transform:translate(-50%,-50%)}
+.modal-head{display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid var(--border)}
+.modal-head .mh-ic{width:36px;height:36px;border-radius:9px;background:var(--chip-active);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.modal-head .mh-ic svg{width:18px;height:18px;stroke:var(--teal);fill:none;stroke-width:1.9}
+.modal-head h2{font-size:16px;font-weight:900;color:#1a1a2e;margin:0}
+.modal-head .mh-sub{font-size:12px;color:var(--muted);font-weight:700;margin-top:2px}
+.modal-close{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.modal-close:hover{background:#f0f3f5}
+.modal-close svg{width:15px;height:15px;stroke:#888;fill:none;stroke-width:2}
+.modal-body{padding:20px 22px;overflow-y:auto}
+.modal-foot{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:#fafbfc}
+
+.raise-opt{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:15px 16px;border:1px solid var(--border-2);border-radius:11px;background:#fff;transition:all .15s}
+.raise-opt+.raise-opt{margin-top:12px}
+.raise-opt:hover{border-color:var(--teal);background:#fafdfe;transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,127,153,.09)}
+.raise-opt .ro-ic{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.raise-opt .ro-ic svg{width:21px;height:21px;stroke:#fff;fill:none;stroke-width:1.9}
+.raise-opt .ro-ic.a{background:linear-gradient(135deg,var(--teal),var(--teal-dark))}
+.raise-opt .ro-ic.b{background:#6a3cb3}
+.raise-opt .ro-ic.c{background:var(--warn)}
+.raise-opt .ro-tx{flex:1;min-width:0}
+.raise-opt .ro-t{font-size:14px;font-weight:800;color:#1a1a2e;display:flex;align-items:center;gap:8px}
+.raise-opt .ro-badge{font-size:9px;font-weight:900;letter-spacing:.5px;background:var(--lime);color:#1a1a1a;padding:2px 6px;border-radius:4px;text-transform:uppercase}
+.raise-opt .ro-d{font-size:12px;color:var(--muted-2);margin-top:3px;line-height:1.45}
+.raise-opt .ro-ch{color:#ccc;flex-shrink:0}
+.raise-opt .ro-ch svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2}
+.raise-opt:hover .ro-ch{color:var(--teal)}
+
+.ag-label{font-size:13px;font-weight:700;color:#444;margin-bottom:8px;display:block}
+.ag-textarea{width:100%;border:1px solid var(--border-2);border-radius:10px;padding:14px;font-family:inherit;font-size:14px;min-height:132px;resize:vertical;outline:none;line-height:1.55}
+.ag-textarea:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(0,127,153,.08)}
+.ag-examples{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.ag-ex{font-size:12px;color:var(--teal-dark);background:var(--chip);border:1px solid var(--border);border-radius:16px;padding:6px 12px;font-weight:700;text-align:left}
+.ag-ex:hover{background:var(--chip-active)}
+.ag-processing{display:flex;align-items:center;gap:14px;padding:30px 4px}
+.ag-spin{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--teal),var(--teal-dark));display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ag-spin svg{width:22px;height:22px;stroke:var(--lime);fill:none;stroke-width:2}
+.ag-processing .agp-t{font-weight:800;color:#1a1a2e}
+.ag-processing .agp-s{font-size:12px;color:var(--muted);margin-top:2px}
+.ag-detected-head{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:var(--success);margin-bottom:14px;line-height:1.4}
+.ag-detected-head svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2.3;flex-shrink:0}
+.ag-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ag-f{background:var(--autofill);border:1px solid var(--autofill-border);border-radius:9px;padding:11px 13px}
+.ag-f.span-2{grid-column:span 2}
+.ag-f .agf-k{font-size:10px;font-weight:800;color:#2a7a50;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.ag-f .agf-v{font-size:13px;font-weight:700;color:#1a1a2e;line-height:1.4;width:100%;border:none;background:transparent;outline:none;font-family:inherit}
+.ag-f textarea.agf-v{resize:vertical;min-height:64px}
+
+.gs{position:fixed;top:0;right:0;height:100vh;width:min(400px,94vw);background:#fff;border-left:1px solid var(--border);box-shadow:-12px 0 44px rgba(0,0,0,.13);z-index:210;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s ease}
+.gs.show{transform:translateX(0)}
+.gs-head{background:var(--teal-dark);color:#fff;padding:15px 18px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.gs-head .gsh-ic{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.13);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.gs-head .gsh-ic svg{width:18px;height:18px;stroke:var(--lime);fill:none;stroke-width:2}
+.gs-head .gsh-t{font-weight:900;font-size:15px}
+.gs-head .gsh-s{font-size:11px;color:#bfe0e6;margin-top:1px}
+.gs-head .gsh-x{margin-left:auto;width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#bfe0e6;flex-shrink:0}
+.gs-head .gsh-x:hover{background:rgba(255,255,255,.12)}
+.gs-head .gsh-x svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2}
+.gs-progress{height:3px;background:#e6e8ea;flex-shrink:0}
+.gs-progress-fill{height:100%;background:var(--teal);width:0;transition:width .35s ease}
+.gs-body{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:13px}
+.gs-msg{display:flex;gap:10px;max-width:92%}
+.gs-msg .gsm-av{width:28px;height:28px;border-radius:8px;background:var(--teal);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.gs-msg .gsm-av svg{width:14px;height:14px;stroke:var(--lime);fill:none;stroke-width:2}
+.gs-msg .gsm-b{background:var(--chip);border-radius:12px;border-top-left-radius:3px;padding:10px 13px;font-size:13px;line-height:1.5;color:#333}
+.gs-msg.user{align-self:flex-end;flex-direction:row-reverse}
+.gs-msg.user .gsm-b{background:var(--teal-dark);color:#fff;border-top-left-radius:12px;border-top-right-radius:3px}
+.gs-opts{display:flex;flex-wrap:wrap;gap:8px;padding-left:38px}
+.gs-opt{border:1px solid var(--border-2);background:#fff;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:700;color:#333;transition:all .12s;display:flex;align-items:center;gap:8px}
+.gs-opt:hover{border-color:var(--teal);background:#fafdfe;color:var(--teal-dark)}
+.gs-opt svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2}
+.gs-opt .tk-av{width:22px;height:22px;font-size:10px}
+.gs-foot{border-top:1px solid var(--border);padding:12px 14px;flex-shrink:0}
+.gs-inrow{display:flex;gap:8px;align-items:center;border:1px solid var(--border-2);border-radius:22px;padding:5px 6px 5px 14px}
+.gs-inrow:focus-within{border-color:var(--teal)}
+.gs-inrow input{flex:1;border:none;outline:none;font-size:13px;padding:7px 0;font-family:inherit}
+.gs-send{width:32px;height:32px;border-radius:50%;background:var(--teal-dark);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.gs-send:hover{background:var(--teal-ink)}
+.gs-send svg{width:14px;height:14px;stroke:#fff;fill:none;stroke-width:2}
+.gs-stu-wrap{padding-left:38px}
+.gs-combo{display:flex;flex-direction:column;gap:6px}
+.gs-stu-list{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:6px;background:#fff;box-shadow:0 6px 20px rgba(0,0,0,.06)}
+.gs-stu-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 10px;border-radius:8px;transition:background .1s}
+.gs-stu-item:hover{background:#f5f7f8}
+.gs-stu-item .tk-av{width:28px;height:28px;font-size:11px;flex-shrink:0}
+.gs-stu-tx{display:flex;flex-direction:column;min-width:0}
+.gs-stu-n{font-size:13px;font-weight:700;color:#1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gs-stu-e{font-size:11px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gs-stu-empty{padding-left:38px;font-size:12px;color:#aaa}
+.gs-summary{background:var(--autofill);border:1px solid var(--autofill-border);border-radius:11px;padding:14px 15px;margin-left:38px}
+.gs-summary .gss-row{display:flex;justify-content:space-between;gap:12px;padding:5px 0}
+.gs-summary .gss-k{color:#2a7a50;font-weight:800;text-transform:uppercase;letter-spacing:.4px;font-size:10px}
+.gs-summary .gss-v{font-weight:700;color:#1a1a2e;text-align:right;font-size:12px}
+</style>
+
+<!-- ── SVG Symbols ── -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6"/><circle cx="17" cy="7" r="3"/><path d="M22 20c0-3-2-5-5-5"/></symbol>
+  <symbol id="i-bank" viewBox="0 0 24 24"><path d="M3 10l9-6 9 6"/><path d="M5 10v9M9 10v9M15 10v9M19 10v9M3 21h18"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></symbol>
+  <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M15 5v2m0 4v2m0 4v2"/><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="2"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><polygon points="22,3 2,3 10,12.5 10,19 14,21 14,12.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><polyline points="4,13 9,18 20,6"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><polyline points="15,6 9,12 15,18"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><polyline points="9,6 15,12 9,18"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></symbol>
+  <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="M21.4 11.6l-9-9a5 5 0 0 0-7 7l9 9a3 3 0 0 0 4.2-4.2l-8.5-8.5a1 1 0 0 0-1.4 1.4l7.8 7.8"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></symbol>
+  <symbol id="i-message" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5,12 12,5 19,12"/></symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19,12 12,19 5,12"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><polyline points="23,4 23,10 17,10"/><path d="M20.5 15.5A9 9 0 1 1 21 8.3l2 1.7"/></symbol>
+</svg>
+
+<div class="app">
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="logo"><span class="flow">FLOW</span><span class="ai">AI</span></div>
+    <nav class="nav">
+      <div class="nav-item"><svg><use href="#i-dashboard"/></svg>Dashboard</div>
+      <div class="nav-item"><svg><use href="#i-users"/></svg>Students</div>
+      <div class="nav-item"><svg><use href="#i-bank"/></svg>Universities</div>
+      <div class="nav-item"><svg><use href="#i-doc"/></svg>Manage<br>Applications</div>
+      <div class="nav-item active" id="nav-queries">
+        <span class="nav-icon-wrap">
+          <svg><use href="#i-ticket"/></svg>
+          <span class="nav-badge">4</span>
+        </span>
+        Queries
+      </div>
+      <div class="nav-item"><svg><use href="#i-menu"/></svg>More</div>
+    </nav>
+  </aside>
+
+  <!-- ── Right pane ── -->
+  <div class="right-pane">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="topbar-crumb" id="topbarCrumb">Queries › <span>My Tickets</span></span>
+      </div>
+      <div class="topbar-right">
+        <div class="notif-btn"><svg><use href="#i-bell"/></svg><div class="notif-dot"></div></div>
+        <div class="avatar">A</div>
+      </div>
+    </header>
+
+    <main class="main">
+
+      <!-- ═══════════════════════════════════════
+           VIEW: TICKET LIST
+           ═══════════════════════════════════════ -->
+      <div class="qm-view active" id="view-list">
+        <div class="qm-header">
+          <div class="qm-title-row">
+            <h1>Query Management</h1>
+            <div class="qm-title-actions">
+              <button class="btn btn-outline btn-sm"><svg><use href="#i-download"/></svg>Export</button>
+              <button class="btn btn-primary" onclick="openRaiseChooser()"><svg><use href="#i-plus"/></svg>Raise Query</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="qm-stats" style="margin-top:12px">
+          <div class="qs-card open">
+            <div class="qs-ic"><svg><use href="#i-ticket"/></svg></div>
+            <div class="qs-num">4</div>
+            <div class="qs-label">Open</div>
+            <div class="qs-delta up"><svg><use href="#i-arrow-up"/></svg>+2 this week</div>
+          </div>
+          <div class="qs-card pending">
+            <div class="qs-ic"><svg><use href="#i-clock"/></svg></div>
+            <div class="qs-num">3</div>
+            <div class="qs-label">Awaiting Response</div>
+          </div>
+          <div class="qs-card breached">
+            <div class="qs-ic"><svg><use href="#i-alert"/></svg></div>
+            <div class="qs-num">1</div>
+            <div class="qs-label">SLA Breached</div>
+            <div class="qs-delta up"><svg><use href="#i-alert"/></svg>Action needed</div>
+          </div>
+          <div class="qs-card resolved">
+            <div class="qs-ic"><svg><use href="#i-check"/></svg></div>
+            <div class="qs-num">12</div>
+            <div class="qs-label">Resolved (30d)</div>
+            <div class="qs-delta down"><svg><use href="#i-arrow-down"/></svg>Avg 6.2 hrs</div>
+          </div>
+          <div class="qs-card total">
+            <div class="qs-ic"><svg><use href="#i-dashboard"/></svg></div>
+            <div class="qs-num">20</div>
+            <div class="qs-label">Total Tickets</div>
+          </div>
+        </div>
+
+        <!-- Tabs + filter -->
+        <div class="qm-tabs">
+          <div class="qm-tab active" onclick="filterTab(this,'all')">All tickets<span class="tab-count">8</span></div>
+          <div class="qm-tab" onclick="filterTab(this,'open')">Open<span class="tab-count">4</span></div>
+          <div class="qm-tab" onclick="filterTab(this,'awaiting')">Awaiting<span class="tab-count">3</span></div>
+          <div class="qm-tab" onclick="filterTab(this,'resolved')">Resolved<span class="tab-count">1</span></div>
+          <div class="qm-filters">
+            <button class="btn btn-outline btn-sm"><svg><use href="#i-filter"/></svg>Filters</button>
+            <div style="position:relative">
+              <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;stroke:#aaa;fill:none;stroke-width:2;pointer-events:none"><use href="#i-search"/></svg>
+              <input type="text" placeholder="Search tickets..." style="padding:7px 12px 7px 30px;border:1px solid var(--border-2);border-radius:6px;font-size:13px;width:200px;outline:none" oninput="searchTickets(this.value)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="qm-table-wrap">
+          <table class="qm-table" id="ticketTable">
+            <thead>
+              <tr>
+                <th>Ticket ID</th>
+                <th>Subject</th>
+                <th>Student</th>
+                <th>Category</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>SLA</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="ticketBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════
+           VIEW: CREATE TICKET
+           ═══════════════════════════════════════ -->
+      <div class="qm-view" id="view-create">
+        <div class="qm-header" style="padding-bottom:0">
+          <div class="qm-title-row">
+            <div style="display:flex;align-items:center;gap:10px">
+              <button class="btn btn-ghost btn-sm" onclick="showView('list')" style="padding:6px">
+                <svg><use href="#i-chevron-left"/></svg> Back
+              </button>
+              <h1 style="font-size:18px">Raise a New Query</h1>
+            </div>
+          </div>
+        </div>
+
+        <div class="ct-wrap">
+          <div class="ct-card fade-in">
+            <div class="ct-head">
+              <svg style="width:18px;height:18px;stroke:var(--teal);fill:none;stroke-width:1.8"><use href="#i-ticket"/></svg>
+              <h2>Ticket Details</h2>
+              <div class="ct-step">Auto-assigned to Ops team</div>
+            </div>
+            <div class="ct-body">
+
+              <!-- Student & basic info -->
+              <div class="ct-section">
+                <div class="ct-section-title"><svg><use href="#i-user"/></svg>Query Information</div>
+                <div class="ct-grid">
+                  <div class="ct-field span-2">
+                    <label>Subject<span class="req">*</span></label>
+                    <input type="text" id="ct-subject" placeholder="e.g. Visa rejection for Anshul — need escalation">
+                  </div>
+                  <div class="ct-field">
+                    <label>Student<span class="req">*</span></label>
+                    <div class="student-search-wrap">
+                      <input type="text" id="ct-student" placeholder="Search student name..." oninput="searchStudents(this.value)" onfocus="searchStudents(this.value)" autocomplete="off">
+                      <div class="student-dropdown" id="studentDropdown"></div>
+                    </div>
+                  </div>
+                  <div class="ct-field">
+                    <label>Category<span class="req">*</span></label>
+                    <select id="ct-category">
+                      <option value="">Select category...</option>
+                      <option value="visa">Visa & Immigration</option>
+                      <option value="docs">Documents & Verification</option>
+                      <option value="app-status">Application Status</option>
+                      <option value="offer-letter">Offer Letter Issues</option>
+                      <option value="fee">Fee & Payment</option>
+                      <option value="coe">CoE / CAS Issues</option>
+                      <option value="scholarship">Scholarship Query</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div class="ct-field">
+                    <label>Priority<span class="req">*</span></label>
+                    <select id="ct-priority" onchange="updateSLAPreview()">
+                      <option value="">Select priority...</option>
+                      <option value="urgent">Urgent — Deadline in 24hrs</option>
+                      <option value="high">High — Needs action in 48hrs</option>
+                      <option value="medium">Medium — Respond in 3 days</option>
+                      <option value="low">Low — General inquiry</option>
+                    </select>
+                  </div>
+                  <div class="ct-field">
+                    <label>Related Application</label>
+                    <select id="ct-application">
+                      <option value="">Select application (optional)</option>
+                      <option>University of Sydney — Bachelor of CS</option>
+                      <option>Kaplan Business School — MBA</option>
+                      <option>Deakin University — Masters of IT</option>
+                      <option>La Trobe University — BA Communications</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- SLA Preview -->
+                <div class="sla-preview" id="slaPreview" style="margin-top:16px">
+                  <div class="sla-preview-icon" id="slaPriIcon"><svg><use href="#i-clock"/></svg></div>
+                  <div class="sla-preview-item">
+                    <div class="sla-preview-label">First Response SLA</div>
+                    <div class="sla-preview-val" id="slaFR">—</div>
+                  </div>
+                  <div class="sla-preview-item">
+                    <div class="sla-preview-label">Resolution SLA</div>
+                    <div class="sla-preview-val" id="slaRes">—</div>
+                  </div>
+                  <div class="sla-preview-item">
+                    <div class="sla-preview-label">Assigned To</div>
+                    <div class="sla-preview-val">Central Ops Team</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Description -->
+              <div class="ct-section">
+                <div class="ct-section-title"><svg><use href="#i-message"/></svg>Description</div>
+                <div class="ct-grid" style="grid-template-columns:1fr">
+                  <div class="ct-field">
+                    <label>Describe the issue in detail<span class="req">*</span></label>
+                    <textarea id="ct-desc" placeholder="Provide context: what happened, what was expected, any deadlines involved..."></textarea>
+                    <div class="field-hint">Include relevant dates, reference numbers, and any communication with the university.</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Attachments -->
+              <div class="ct-section">
+                <div class="ct-section-title"><svg><use href="#i-paperclip"/></svg>Attachments</div>
+                <div class="attach-zone" onclick="showToast('File picker would open here')">
+                  <svg><use href="#i-paperclip"/></svg>
+                  <span>Drag files here or click to attach supporting documents (PDF, JPG, PNG — max 10MB)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="ct-footer">
+              <button class="btn btn-outline" onclick="showView('list')">Cancel</button>
+              <button class="btn btn-primary btn-lg" onclick="submitTicket()">
+                <svg><use href="#i-send"/></svg>Submit Query
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════
+           VIEW: TICKET DETAIL
+           ═══════════════════════════════════════ -->
+      <div class="qm-view" id="view-detail">
+        <div class="qm-header" style="padding-bottom:12px">
+          <div class="qm-title-row">
+            <div style="display:flex;align-items:center;gap:10px">
+              <button class="btn btn-ghost btn-sm" onclick="showView('list')" style="padding:6px">
+                <svg><use href="#i-chevron-left"/></svg> Back
+              </button>
+              <h1 style="font-size:18px" id="detailTitle">Ticket #QR-0041</h1>
+            </div>
+            <div class="qm-title-actions">
+              <button class="btn btn-outline btn-sm"><svg><use href="#i-edit"/></svg>Edit</button>
+              <button class="btn btn-teal btn-sm" onclick="resolveTicket()"><svg><use href="#i-check"/></svg>Mark Resolved</button>
+            </div>
+          </div>
+        </div>
+        <div class="td-wrap">
+          <div class="td-layout" id="detailContent">
+            <!-- Filled dynamically -->
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══ Raise flows ══ -->
+<div class="ov" id="raiseOv" onclick="closeAllRaise()"></div>
+
+<!-- Chooser -->
+<div class="modal" id="raiseChooser">
+  <div class="modal-head">
+    <div class="mh-ic"><svg><use href="#i-plus"/></svg></div>
+    <div style="flex:1"><h2>Raise a Query</h2><div class="mh-sub">Choose how you'd like to create this ticket</div></div>
+    <button class="modal-close" onclick="closeAllRaise()"><svg><use href="#i-close"/></svg></button>
+  </div>
+  <div class="modal-body">
+    <button class="raise-opt" onclick="openAgentic()">
+      <div class="ro-ic a"><svg><use href="#i-zap"/></svg></div>
+      <div class="ro-tx"><div class="ro-t">Describe it to FlowAI <span class="ro-badge">Fastest</span></div><div class="ro-d">Type the issue in plain English. FlowAI drafts the whole ticket — you confirm once.</div></div>
+      <span class="ro-ch"><svg><use href="#i-chevron-right"/></svg></span>
+    </button>
+    <button class="raise-opt" onclick="openGuided()">
+      <div class="ro-ic c"><svg><use href="#i-message"/></svg></div>
+      <div class="ro-tx"><div class="ro-t">Guided chat</div><div class="ro-d">Answer a few quick prompts in a side panel — tap to pick, barely any typing.</div></div>
+      <span class="ro-ch"><svg><use href="#i-chevron-right"/></svg></span>
+    </button>
+    <button class="raise-opt" onclick="openManual()">
+      <div class="ro-ic b"><svg><use href="#i-edit"/></svg></div>
+      <div class="ro-tx"><div class="ro-t">Fill in the form</div><div class="ro-d">Enter every detail yourself in the full ticket form.</div></div>
+      <span class="ro-ch"><svg><use href="#i-chevron-right"/></svg></span>
+    </button>
+  </div>
+</div>
+
+<!-- Agentic -->
+<div class="modal" id="agenticModal">
+  <div class="modal-head">
+    <div class="mh-ic"><svg><use href="#i-zap"/></svg></div>
+    <div style="flex:1"><h2>Raise with FlowAI</h2><div class="mh-sub" id="agSub">Describe the issue — FlowAI will draft the ticket</div></div>
+    <button class="modal-close" onclick="closeAllRaise()"><svg><use href="#i-close"/></svg></button>
+  </div>
+  <div class="modal-body" id="agBody"></div>
+  <div class="modal-foot" id="agFoot"></div>
+</div>
+
+<!-- Guided side sheet -->
+<div class="gs" id="guidedSheet">
+  <div class="gs-head">
+    <div class="gsh-ic"><svg><use href="#i-zap"/></svg></div>
+    <div style="flex:1"><div class="gsh-t">FlowAI · Guided</div><div class="gsh-s">Raise a query in a few taps</div></div>
+    <button class="gsh-x" onclick="closeAllRaise()"><svg><use href="#i-close"/></svg></button>
+  </div>
+  <div class="gs-progress"><div class="gs-progress-fill" id="gsProg"></div></div>
+  <div class="gs-body" id="gsBody"></div>
+  <div class="gs-foot" id="gsFoot" style="display:none"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"><svg><use href="#i-check"/></svg><span id="toastMsg">Done</span></div>
+
+<script>
+// ── DATA ──
+const SLA_CONFIG = {
+  urgent:  { fr: 2,  res: 8,  frLabel:'2 hours',  resLabel:'8 hours'  },
+  high:    { fr: 4,  res: 24, frLabel:'4 hours',  resLabel:'24 hours' },
+  medium:  { fr: 8,  res: 72, frLabel:'8 hours',  resLabel:'3 days'   },
+  low:     { fr: 24, res:168, frLabel:'24 hours', resLabel:'7 days'   }
+};
+
+const STUDENTS = [
+  { name:'Anshul Aggarwal', email:'anshul.a@email.com', init:'A', bg:'#e1f1f4', fg:'#007f99' },
+  { name:'Nitin Kumar Nanda', email:'nitin.n@email.com', init:'N', bg:'#f0e8fc', fg:'#6a3cb3' },
+  { name:'Zenny Arul', email:'zenny.a@email.com', init:'Z', bg:'#fce8e3', fg:'#c0392b' },
+  { name:'Rajesh Kumar Sharma', email:'rajesh.s@email.com', init:'R', bg:'#fff8e6', fg:'#8a5c00' },
+  { name:'Priya Mehta', email:'priya.m@email.com', init:'P', bg:'#fde8f5', fg:'#8b1a6b' },
+];
+
+const CATEGORIES = {
+  'visa':'Visa & Immigration','docs':'Documents & Verification',
+  'app-status':'Application Status','offer-letter':'Offer Letter Issues',
+  'fee':'Fee & Payment','coe':'CoE / CAS Issues','scholarship':'Scholarship Query','other':'Other'
+};
+const CAT_ICONS = {
+  'visa':'i-shield','docs':'i-doc','app-status':'i-eye','offer-letter':'i-doc',
+  'fee':'i-doc','coe':'i-doc','scholarship':'i-doc','other':'i-message'
+};
+
+let tickets = [
+  { id:'QR-0041',subject:'Visa 600 rejection — urgent re-application needed for Anshul',student:STUDENTS[0],category:'visa',priority:'urgent',status:'open',
+    created:'2026-04-28T09:15:00',frRespondedAt:null,resolvedAt:null,
+    description:'Anshul\'s Student Visa (subclass 600) was rejected by the Australian Embassy on April 27. The rejection letter cites insufficient financial evidence. We need to compile updated bank statements and a revised GTE letter before the May 5 deadline for the July intake at University of Sydney.',
+    activity:[
+      {type:'created',text:'Ticket created by <strong>Agent A (You)</strong>',time:'Apr 28, 9:15 AM'},
+      {type:'note',text:'<strong>System:</strong> Auto-assigned to Central Ops Team',time:'Apr 28, 9:15 AM'},
+    ]
+  },
+  { id:'QR-0040',subject:'Missing 12th marksheet — La Trobe requesting original',student:STUDENTS[3],category:'docs',priority:'high',status:'in-progress',
+    created:'2026-04-27T14:30:00',frRespondedAt:'2026-04-27T16:45:00',resolvedAt:null,
+    description:'La Trobe University has requested the original 12th marksheet for Rajesh Kumar Sharma. The current uploaded document is a scanned copy and they need an attested version. Rajesh says his school is taking 2 weeks to issue a fresh copy.',
+    activity:[
+      {type:'created',text:'Ticket created by <strong>Agent A (You)</strong>',time:'Apr 27, 2:30 PM'},
+      {type:'response',text:'<strong>Ops Team (Meera)</strong> responded',time:'Apr 27, 4:45 PM',comment:'I\'ve emailed La Trobe admissions to request a 2-week extension. Will update once they confirm.'},
+      {type:'note',text:'<strong>Agent A</strong> added a note',time:'Apr 28, 10:00 AM',comment:'Rajesh confirmed the school will issue the document by May 10.'},
+    ]
+  },
+  { id:'QR-0039',subject:'Application status stuck at "Under Review" for 3 weeks — Deakin',student:STUDENTS[2],category:'app-status',priority:'medium',status:'awaiting',
+    created:'2026-04-25T10:00:00',frRespondedAt:'2026-04-25T15:20:00',resolvedAt:null,
+    description:'Zenny\'s application to Deakin University Masters of IT has been showing "Under Review" for over 3 weeks. The typical turnaround is 2 weeks. We need to follow up with the admissions office.',
+    activity:[
+      {type:'created',text:'Ticket created by <strong>Agent A (You)</strong>',time:'Apr 25, 10:00 AM'},
+      {type:'response',text:'<strong>Ops Team (Ravi)</strong> responded',time:'Apr 25, 3:20 PM',comment:'Reached out to Deakin admissions. They\'re experiencing a backlog. Expected update by end of this week.'},
+    ]
+  },
+  { id:'QR-0038',subject:'Offer letter has wrong course code — University of Sydney',student:STUDENTS[0],category:'offer-letter',priority:'high',status:'open',
+    created:'2026-04-26T11:00:00',frRespondedAt:null,resolvedAt:null,
+    description:'The conditional offer letter from University of Sydney lists the course code as BCSCI2024 instead of BCSCI2026. This needs to be corrected before Anshul can accept the offer and proceed with visa application.',
+    activity:[
+      {type:'created',text:'Ticket created by <strong>Agent A (You)</strong>',time:'Apr 26, 11:00 AM'},
+    ]
+  },
+  { id:'QR-0037',subject:'CoE delayed — Kaplan Business School',student:STUDENTS[1],category:'coe',priority:'medium',status:'awaiting',
+    created:'2026-04-22T09:30:00',frRespondedAt:'2026-04-22T13:10:00',resolvedAt:null,
+    description:'Nitin\'s CoE from Kaplan Business School has been delayed. Payment was confirmed on April 15 but CoE hasn\'t been issued yet. Kaplan says processing takes 5 business days but it\'s been over a week.',
+    activity:[
+      {type:'created',text:'Ticket created by <strong>Agent A (You)</strong>',time:'Apr 22, 9:30 AM'},
+      {type:'response',text:'<strong>Ops Team (Meera)</strong> responded',time:'Apr 22, 1:10 PM',comment:'Following up with Kaplan finance team. They confirmed receipt of payment but there\'s a system backlog.'},
+      {type:'note',text:'<strong>Ops Team (Meera)</strong> escalated internally',time:'Apr 24, 9:00 AM',comment:'Escalated to Kaplan regional manager. Awaiting priority processing confirmation.'},
+    ]
+  },
+  { id:'QR-0036',subject:'Scholarship application deadline clarification — Priya',student:STUDENTS[4],category:'scholarship',priority:'low',status:'awaiting',
+    created:'2026-04-20T16:00:00',frRespondedAt:'2026-04-21T09:30:00',resolvedAt:null,
+    description:'Priya wants to know the exact deadline for the University of Melbourne International Merit Scholarship. The website shows two different dates.',
+    activity:[
+      {type:'created',text:'Ticket created by <strong>Agent A (You)</strong>',time:'Apr 20, 4:00 PM'},
+      {type:'response',text:'<strong>Ops Team (Ravi)</strong> responded',time:'Apr 21, 9:30 AM',comment:'Emailed UoM scholarships office for clarification. Usually they reply within 2-3 business days.'},
+    ]
+  },
+  { id:'QR-0035',subject:'GTE letter review request — Nitin MBA application',student:STUDENTS[1],category:'docs',priority:'medium',status:'resolved',
+    created:'2026-04-18T10:00:00',frRespondedAt:'2026-04-18T12:30:00',resolvedAt:'2026-04-19T16:00:00',
+    description:'Nitin needs his GTE (Genuine Temporary Entrant) letter reviewed before submitting his visa application for Kaplan Business School MBA.',
+    activity:[
+      {type:'created',text:'Ticket created by <strong>Agent A (You)</strong>',time:'Apr 18, 10:00 AM'},
+      {type:'response',text:'<strong>Ops Team (Meera)</strong> responded',time:'Apr 18, 12:30 PM',comment:'Reviewing the GTE letter now. Will send tracked changes by end of day.'},
+      {type:'resolved',text:'<strong>Ops Team (Meera)</strong> resolved the ticket',time:'Apr 19, 4:00 PM',comment:'GTE letter reviewed and corrections sent. Nitin has approved the final version. Letter is ready for submission.'},
+    ]
+  },
+  { id:'QR-0034',subject:'Fee payment receipt not reflecting on portal — Zenny',student:STUDENTS[2],category:'fee',priority:'high',status:'resolved',
+    created:'2026-04-15T14:00:00',frRespondedAt:'2026-04-15T15:20:00',resolvedAt:'2026-04-16T11:00:00',
+    description:'Zenny paid the application fee for Deakin University 5 days ago but the payment is not reflecting on the student portal.',
+    activity:[
+      {type:'created',text:'Ticket created by <strong>Agent A (You)</strong>',time:'Apr 15, 2:00 PM'},
+      {type:'response',text:'<strong>Ops Team (Ravi)</strong> responded',time:'Apr 15, 3:20 PM',comment:'Contacted Deakin finance department with the transaction reference.'},
+      {type:'resolved',text:'<strong>Ops Team (Ravi)</strong> resolved the ticket',time:'Apr 16, 11:00 AM',comment:'Deakin confirmed the payment has been reconciled. Portal updated now.'},
+    ]
+  }
+];
+
+let currentFilter = 'all';
+let selectedStudent = null;
+let viewingTicket = null;
+
+// ── RENDER ──
+function renderTickets() {
+  const body = document.getElementById('ticketBody');
+  const now = new Date('2026-04-29T12:00:00');
+  let filtered = tickets;
+  if (currentFilter !== 'all') {
+    if (currentFilter === 'open') filtered = tickets.filter(t => t.status === 'open' || t.status === 'in-progress');
+    else if (currentFilter === 'awaiting') filtered = tickets.filter(t => t.status === 'awaiting');
+    else if (currentFilter === 'resolved') filtered = tickets.filter(t => t.status === 'resolved' || t.status === 'closed');
+  }
+
+  body.innerHTML = filtered.map(t => {
+    const sla = SLA_CONFIG[t.priority];
+    const createdDate = new Date(t.created);
+    const hoursElapsed = (now - createdDate) / 3600000;
+
+    // FR SLA
+    let frPct, frStatus, frTime;
+    if (t.frRespondedAt) {
+      const frHours = (new Date(t.frRespondedAt) - createdDate) / 3600000;
+      frPct = Math.min((frHours / sla.fr) * 100, 100);
+      frStatus = frHours <= sla.fr ? 'ok' : 'breach';
+      frTime = formatHours(frHours) + ' / ' + sla.frLabel;
+    } else {
+      frPct = Math.min((hoursElapsed / sla.fr) * 100, 150);
+      frStatus = hoursElapsed > sla.fr ? 'breach' : hoursElapsed > sla.fr * 0.75 ? 'warn' : 'ok';
+      frTime = formatHours(hoursElapsed) + ' / ' + sla.frLabel;
+    }
+
+    // Resolution SLA
+    let resPct, resStatus, resTime;
+    if (t.resolvedAt) {
+      const resHours = (new Date(t.resolvedAt) - createdDate) / 3600000;
+      resPct = Math.min((resHours / sla.res) * 100, 100);
+      resStatus = resHours <= sla.res ? 'ok' : 'breach';
+      resTime = formatHours(resHours) + ' / ' + sla.resLabel;
+    } else {
+      resPct = Math.min((hoursElapsed / sla.res) * 100, 150);
+      resStatus = hoursElapsed > sla.res ? 'breach' : hoursElapsed > sla.res * 0.75 ? 'warn' : 'ok';
+      resTime = formatHours(hoursElapsed) + ' / ' + sla.resLabel;
+    }
+
+    const isBreach = frStatus === 'breach' || resStatus === 'breach';
+    const dateStr = formatDate(createdDate);
+
+    return `<tr class="${isBreach && t.status !== 'resolved' ? 'sla-breach':''}" onclick="openTicketDetail('${t.id}')">
+      <td><span class="tk-id">${t.id}</span></td>
+      <td><span class="tk-subject">${t.subject}</span></td>
+      <td><div class="tk-student"><div class="tk-av" style="background:${t.student.bg};color:${t.student.fg}">${t.student.init}</div><span class="tk-sname">${t.student.name}</span></div></td>
+      <td><span class="cat-chip"><svg><use href="#${CAT_ICONS[t.category]||'i-message'}"/></svg>${CATEGORIES[t.category]}</span></td>
+      <td><span class="pri-pill ${t.priority}"><span class="pri-dot"></span>${capitalize(t.priority)}</span></td>
+      <td><span class="status-pill ${t.status}"><span class="status-dot"></span>${statusLabel(t.status)}</span></td>
+      <td><div class="sla-cell">
+        <div class="sla-row"><span class="sla-label">FR</span><div class="sla-bar-track"><div class="sla-bar-fill ${frStatus}" style="width:${Math.min(frPct,100)}%"></div></div><span class="sla-time ${frStatus}">${frTime}</span></div>
+        <div class="sla-row"><span class="sla-label">RES</span><div class="sla-bar-track"><div class="sla-bar-fill ${resStatus}" style="width:${Math.min(resPct,100)}%"></div></div><span class="sla-time ${resStatus}">${resTime}</span></div>
+      </div></td>
+      <td><span class="tk-date">${dateStr}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function openTicketDetail(id) {
+  viewingTicket = tickets.find(t => t.id === id);
+  if (!viewingTicket) return;
+  document.getElementById('detailTitle').textContent = 'Ticket #' + viewingTicket.id;
+  document.getElementById('topbarCrumb').innerHTML = `Queries › <span>${viewingTicket.id} — ${viewingTicket.student.name}</span>`;
+  renderDetail();
+  showView('detail');
+}
+
+function renderDetail() {
+  const t = viewingTicket;
+  const sla = SLA_CONFIG[t.priority];
+  const now = new Date('2026-04-29T12:00:00');
+  const createdDate = new Date(t.created);
+  const hoursElapsed = (now - createdDate) / 3600000;
+
+  // FR
+  let frPct, frStatus, frLabel, frElapsed;
+  if (t.frRespondedAt) {
+    frElapsed = (new Date(t.frRespondedAt) - createdDate) / 3600000;
+    frPct = Math.min((frElapsed / sla.fr) * 100, 100);
+    frStatus = frElapsed <= sla.fr ? 'ok' : 'breach';
+    frLabel = 'Responded in ' + formatHours(frElapsed);
+  } else {
+    frElapsed = hoursElapsed;
+    frPct = Math.min((hoursElapsed / sla.fr) * 100, 150);
+    frStatus = hoursElapsed > sla.fr ? 'breach' : hoursElapsed > sla.fr * 0.75 ? 'warn' : 'ok';
+    frLabel = formatHours(hoursElapsed) + ' elapsed of ' + sla.frLabel;
+  }
+
+  // Resolution
+  let resPct, resStatus, resLabel, resElapsed;
+  if (t.resolvedAt) {
+    resElapsed = (new Date(t.resolvedAt) - createdDate) / 3600000;
+    resPct = Math.min((resElapsed / sla.res) * 100, 100);
+    resStatus = resElapsed <= sla.res ? 'ok' : 'breach';
+    resLabel = 'Resolved in ' + formatHours(resElapsed);
+  } else {
+    resElapsed = hoursElapsed;
+    resPct = Math.min((hoursElapsed / sla.res) * 100, 150);
+    resStatus = hoursElapsed > sla.res ? 'breach' : hoursElapsed > sla.res * 0.75 ? 'warn' : 'ok';
+    resLabel = formatHours(hoursElapsed) + ' elapsed of ' + sla.resLabel;
+  }
+
+  const frStatusLabel = frStatus === 'ok' ? (t.frRespondedAt ? 'Met' : 'On Track') : frStatus === 'warn' ? 'At Risk' : 'Breached';
+  const resStatusLabel = resStatus === 'ok' ? (t.resolvedAt ? 'Met' : 'On Track') : resStatus === 'warn' ? 'At Risk' : 'Breached';
+
+  const container = document.getElementById('detailContent');
+  container.innerHTML = `
+    <div class="td-main fade-in">
+      <!-- Header card -->
+      <div class="td-header-card">
+        <div class="td-top-row">
+          <span class="td-id-badge">${t.id}</span>
+          <div class="td-subject">${t.subject}</div>
+          <span class="status-pill ${t.status}"><span class="status-dot"></span>${statusLabel(t.status)}</span>
+        </div>
+        <div class="td-meta-grid">
+          <div class="td-meta-item"><div class="td-meta-label">Student</div><div class="td-meta-val">${t.student.name}</div></div>
+          <div class="td-meta-item"><div class="td-meta-label">Category</div><div class="td-meta-val">${CATEGORIES[t.category]}</div></div>
+          <div class="td-meta-item"><div class="td-meta-label">Priority</div><div class="td-meta-val"><span class="pri-pill ${t.priority}"><span class="pri-dot"></span>${capitalize(t.priority)}</span></div></div>
+          <div class="td-meta-item"><div class="td-meta-label">Created</div><div class="td-meta-val">${formatDate(createdDate)}</div></div>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="td-desc-card">
+        <div class="td-desc-head"><svg><use href="#i-message"/></svg>Description</div>
+        <div class="td-desc-body">${t.description}</div>
+      </div>
+
+      <!-- Activity -->
+      <div class="td-activity-card">
+        <div class="td-act-head">Activity Timeline</div>
+        <div class="td-timeline">
+          ${t.activity.map(a => `
+            <div class="tl-item">
+              <div class="tl-dot ${a.type}"><svg><use href="#${a.type==='created'?'i-plus':a.type==='response'?'i-message':a.type==='resolved'?'i-check':'i-edit'}"/></svg></div>
+              <div class="tl-content">
+                <div class="tl-text">${a.text}</div>
+                <div class="tl-time">${a.time}</div>
+                ${a.comment ? `<div class="tl-comment-box">${a.comment}</div>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <!-- Reply box -->
+        <div class="reply-box" style="margin:0 20px 18px">
+          <textarea class="reply-input" placeholder="Add a note or reply..." rows="1" id="replyInput"></textarea>
+          <button class="reply-send" onclick="addReply()"><svg><use href="#i-send"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="td-aside fade-in" style="animation-delay:.08s">
+      <!-- SLA panel -->
+      <div class="td-sla-card">
+        <div class="td-sla-head"><svg><use href="#i-clock"/></svg>SLA Tracking</div>
+        <div class="td-sla-body">
+          <div class="sla-gauge">
+            <div class="sla-gauge-header">
+              <span class="sla-gauge-label">First Response</span>
+              <span class="sla-gauge-status ${frStatus}">${frStatusLabel}</span>
+            </div>
+            <div class="sla-gauge-bar"><div class="sla-gauge-fill ${frStatus}" style="width:${Math.min(frPct,100)}%"></div></div>
+            <div class="sla-gauge-meta"><span>${frLabel}</span><span>Target: ${sla.frLabel}</span></div>
+          </div>
+          <div class="sla-gauge">
+            <div class="sla-gauge-header">
+              <span class="sla-gauge-label">Resolution</span>
+              <span class="sla-gauge-status ${resStatus}">${resStatusLabel}</span>
+            </div>
+            <div class="sla-gauge-bar"><div class="sla-gauge-fill ${resStatus}" style="width:${Math.min(resPct,100)}%"></div></div>
+            <div class="sla-gauge-meta"><span>${resLabel}</span><span>Target: ${sla.resLabel}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Details panel -->
+      <div class="td-details-card">
+        <div class="td-det-head">Details</div>
+        <div class="td-det-body">
+          <div class="td-det-row"><div class="td-det-label">Assigned To</div><div class="td-det-val">Central Ops Team</div></div>
+          <div class="td-det-row"><div class="td-det-label">Raised By</div><div class="td-det-val">Agent A (You)</div></div>
+          <div class="td-det-row"><div class="td-det-label">Student Email</div><div class="td-det-val link">${t.student.email}</div></div>
+          <div class="td-det-row"><div class="td-det-label">Last Updated</div><div class="td-det-val">${t.activity[t.activity.length-1].time}</div></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── VIEW SWITCHING ──
+function showView(id) {
+  document.querySelectorAll('.qm-view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+  if (id === 'list') {
+    document.getElementById('topbarCrumb').innerHTML = 'Queries › <span>My Tickets</span>';
+    renderTickets();
+  }
+  if (id === 'create') {
+    document.getElementById('topbarCrumb').innerHTML = 'Queries › <span>Raise New Query</span>';
+    resetForm();
+  }
+}
+
+// ── FILTERS / SEARCH ──
+function filterTab(el, filter) {
+  document.querySelectorAll('.qm-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentFilter = filter;
+  renderTickets();
+}
+
+function searchTickets(val) {
+  const rows = document.querySelectorAll('#ticketBody tr');
+  const q = val.toLowerCase();
+  rows.forEach(r => {
+    r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+// ── STUDENT SEARCH ──
+function searchStudents(val) {
+  const dd = document.getElementById('studentDropdown');
+  const q = val.toLowerCase();
+  const matches = STUDENTS.filter(s => s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q));
+  if (matches.length && val.length > 0) {
+    dd.innerHTML = matches.map((s,i) => `
+      <div class="sd-item" onclick="selectStudent(${i},'${s.name}')">
+        <div class="sd-av" style="background:${s.bg};color:${s.fg}">${s.init}</div>
+        <div><div class="sd-nm">${s.name}</div><div class="sd-em">${s.email}</div></div>
+      </div>
+    `).join('');
+    dd.classList.add('open');
+  } else {
+    dd.classList.remove('open');
+  }
+}
+
+function selectStudent(idx, name) {
+  const s = STUDENTS.filter(st => st.name === name)[0] || STUDENTS[idx];
+  selectedStudent = s;
+  document.getElementById('ct-student').value = s.name;
+  document.getElementById('studentDropdown').classList.remove('open');
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('.student-search-wrap')) {
+    document.getElementById('studentDropdown').classList.remove('open');
+  }
+});
+
+// ── SLA PREVIEW ──
+function updateSLAPreview() {
+  const pri = document.getElementById('ct-priority').value;
+  const preview = document.getElementById('slaPreview');
+  if (!pri) { preview.classList.remove('show'); return; }
+  const sla = SLA_CONFIG[pri];
+  document.getElementById('slaFR').textContent = sla.frLabel;
+  document.getElementById('slaRes').textContent = sla.resLabel;
+  const icon = document.getElementById('slaPriIcon');
+  icon.className = 'sla-preview-icon ' + pri;
+  preview.classList.add('show');
+}
+
+// ── SUBMIT TICKET ──
+function submitTicket() {
+  const subject = document.getElementById('ct-subject').value.trim();
+  const student = document.getElementById('ct-student').value.trim();
+  const category = document.getElementById('ct-category').value;
+  const priority = document.getElementById('ct-priority').value;
+  const desc = document.getElementById('ct-desc').value.trim();
+
+  if (!subject || !student || !category || !priority || !desc) {
+    showToast('Please fill all required fields');
+    // highlight empty fields
+    ['ct-subject','ct-student','ct-category','ct-priority','ct-desc'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el.value.trim()) el.classList.add('error');
+      else el.classList.remove('error');
+    });
+    return;
+  }
+
+  const sObj = selectedStudent || STUDENTS.find(s => s.name === student) || STUDENTS[0];
+  const newId = 'QR-' + String(42 + tickets.length - 7).padStart(4, '0');
+  const now = new Date().toISOString();
+
+  const newTicket = {
+    id: newId,
+    subject,
+    student: sObj,
+    category,
+    priority,
+    status: 'open',
+    created: '2026-04-29T12:00:00',
+    frRespondedAt: null,
+    resolvedAt: null,
+    description: desc,
+    activity: [
+      { type:'created', text:'Ticket created by <strong>Agent A (You)</strong>', time:'Apr 29, 12:00 PM' },
+      { type:'note', text:'<strong>System:</strong> Auto-assigned to Central Ops Team', time:'Apr 29, 12:00 PM' },
+    ]
+  };
+
+  const id = createTicket({ subject, studentObj: sObj, category, priority, description: desc });
+  showToast('Query ' + id + ' submitted successfully');
+  showView('list');
+}
+
+// ── SHARED: create a ticket from any flow ──
+function createTicket({ subject, studentObj, category, priority, description }) {
+  const sObj = studentObj || STUDENTS[0];
+  const newId = 'QR-' + String(42 + tickets.length - 7).padStart(4, '0');
+  tickets.unshift({
+    id: newId, subject, student: sObj, category, priority, status: 'open',
+    created: '2026-04-29T12:00:00', frRespondedAt: null, resolvedAt: null,
+    description: description || subject,
+    activity: [
+      { type:'created', text:'Ticket created by <strong>Agent A (You)</strong>', time:'Apr 29, 12:00 PM' },
+      { type:'note', text:'<strong>System:</strong> Auto-assigned to Central Ops Team', time:'Apr 29, 12:00 PM' },
+    ]
+  });
+  return newId;
+}
+
+function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ══ RAISE FLOW: chooser ══
+function openRaiseChooser(){
+  closeAllRaise();
+  document.getElementById('raiseOv').classList.add('show');
+  document.getElementById('raiseChooser').classList.add('show');
+}
+function closeAllRaise(){
+  document.getElementById('raiseOv').classList.remove('show');
+  ['raiseChooser','agenticModal'].forEach(id=>document.getElementById(id).classList.remove('show'));
+  document.getElementById('guidedSheet').classList.remove('show');
+}
+function openManual(){ closeAllRaise(); showView('create'); }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeAllRaise(); });
+
+// ══ RAISE FLOW 1: agentic ══
+let agDraftText = '';
+let agSelStudentIdx = -1;
+function openAgentic(){
+  document.getElementById('raiseChooser').classList.remove('show');
+  document.getElementById('guidedSheet').classList.remove('show');
+  document.getElementById('raiseOv').classList.add('show');
+  document.getElementById('agenticModal').classList.add('show');
+  agRenderInput();
+}
+function agRenderInput(){
+  document.getElementById('agSub').textContent = 'Describe the issue — FlowAI will draft the ticket';
+  document.getElementById('agBody').innerHTML = `
+    <label class="ag-label">What's going on?</label>
+    <textarea class="ag-textarea" id="agText" placeholder="e.g. Anshul's student visa got rejected yesterday for insufficient financial evidence — we need to re-apply before the May 5 deadline for University of Sydney.">${escapeHtml(agDraftText)}</textarea>
+    <div class="ag-examples">
+      <button class="ag-ex" onclick="agFill(this)">Anshul's visa was rejected — urgent re-application before the May 5 deadline</button>
+      <button class="ag-ex" onclick="agFill(this)">La Trobe needs the original 12th marksheet for Rajesh, current one is a scan</button>
+      <button class="ag-ex" onclick="agFill(this)">Zenny's Deakin application has been stuck under review for 3 weeks</button>
+    </div>`;
+  document.getElementById('agFoot').innerHTML = `
+    <button class="btn btn-outline" onclick="closeAllRaise()">Cancel</button>
+    <button class="btn btn-primary btn-lg" onclick="agProcess()"><svg><use href="#i-zap"/></svg>Draft ticket</button>`;
+}
+function agFill(el){ document.getElementById('agText').value = el.textContent; }
+function agProcess(){
+  const text = document.getElementById('agText').value.trim();
+  if(!text){ showToast('Describe the issue first'); return; }
+  agDraftText = text;
+  document.getElementById('agBody').innerHTML = `
+    <div class="ag-processing">
+      <div class="ag-spin pulse"><svg><use href="#i-zap"/></svg></div>
+      <div><div class="agp-t">FlowAI is reading your description…</div><div class="agp-s">Extracting the student, category & priority and drafting a subject</div></div>
+    </div>`;
+  document.getElementById('agFoot').innerHTML = '';
+  setTimeout(()=> agRenderConfirm(agExtract(text)), 1000);
+}
+function agExtract(text){
+  const low = text.toLowerCase();
+  let studentObj = STUDENTS.find(s => low.includes(s.name.toLowerCase()))
+                 || STUDENTS.find(s => low.includes(s.name.toLowerCase().split(' ')[0]));
+  const catRules = [
+    ['visa',['visa','immigration','subclass','embassy','gte']],
+    ['docs',['document','marksheet','transcript','certificate','attest','upload']],
+    ['offer-letter',['offer letter','offer','course code','conditional offer']],
+    ['fee',['fee','payment','paid','invoice','receipt','refund']],
+    ['coe',['coe','cas','confirmation of enrol']],
+    ['scholarship',['scholarship','merit','funding','bursary']],
+    ['app-status',['under review','status','stuck','progress']]
+  ];
+  let category = 'other';
+  for(const [k,words] of catRules){ if(words.some(w=>low.includes(w))){ category=k; break; } }
+  let priority = 'medium';
+  if(/(urgent|reject|asap|immediately|today|tomorrow|deadline|expir|24\s*h)/.test(low)) priority='urgent';
+  else if(/(high|escalat|delay|soon|48|two days)/.test(low)) priority='high';
+  else if(/(general|clarif|question|whenever|no rush|low)/.test(low)) priority='low';
+  let subject = (text.trim().split(/[.\n]/)[0] || '').trim();
+  if(subject.length > 72) subject = subject.slice(0,72).trim() + '…';
+  if(!subject) subject = 'New query';
+  return { subject, studentObj, category, priority, description: text.trim() };
+}
+function agRenderConfirm(d){
+  agSelStudentIdx = d.studentObj ? STUDENTS.findIndex(s=>s.name===d.studentObj.name) : -1;
+  document.getElementById('agSub').textContent = 'Review the draft, edit anything, then confirm';
+  const catOpts = Object.entries(CATEGORIES).map(([k,v])=>`<option value="${k}" ${k===d.category?'selected':''}>${v}</option>`).join('');
+  const priOpts = ['urgent','high','medium','low'].map(p=>`<option value="${p}" ${p===d.priority?'selected':''}>${capitalize(p)}</option>`).join('');
+  const stuOpts = STUDENTS.map((s,i)=>`<option value="${i}" ${d.studentObj&&s.name===d.studentObj.name?'selected':''}>${s.name}</option>`).join('');
+  document.getElementById('agBody').innerHTML = `
+    <div class="ag-detected-head"><svg><use href="#i-check"/></svg>FlowAI drafted this from your description — edit anything below, then confirm.</div>
+    <div class="ag-fields">
+      <div class="ag-f span-2"><div class="agf-k">Subject</div><input class="agf-v" id="agSubject" value="${escapeHtml(d.subject)}"></div>
+      <div class="ag-f"><div class="agf-k">Student</div>
+        <div class="student-search-wrap">
+          <input class="agf-v" id="agStudentInput" placeholder="Search student…" value="${d.studentObj?escapeHtml(d.studentObj.name):''}" oninput="agStuDD(this.value)" onfocus="agStuDD(this.value)" autocomplete="off">
+          <div class="student-dropdown" id="agStudentDD"></div>
+        </div>
+      </div>
+      <div class="ag-f"><div class="agf-k">Category</div><select class="agf-v" id="agCat">${catOpts}</select></div>
+      <div class="ag-f"><div class="agf-k">Priority</div><select class="agf-v" id="agPri">${priOpts}</select></div>
+      <div class="ag-f span-2"><div class="agf-k">Description</div><textarea class="agf-v" id="agDesc">${escapeHtml(d.description)}</textarea></div>
+    </div>`;
+  document.getElementById('agFoot').innerHTML = `
+    <button class="btn btn-outline" onclick="agRenderInput()"><svg><use href="#i-chevron-left"/></svg>Back</button>
+    <button class="btn btn-teal btn-lg" onclick="agConfirmCreate()"><svg><use href="#i-check"/></svg>Confirm &amp; create query</button>`;
+}
+function agStuDD(val){
+  const dd=document.getElementById('agStudentDD'); if(!dd) return;
+  const q=(val||'').toLowerCase();
+  const matches=STUDENTS.map((s,i)=>({s,i})).filter(o=>o.s.name.toLowerCase().includes(q)||o.s.email.toLowerCase().includes(q));
+  dd.innerHTML = matches.length
+    ? matches.map(o=>`<div class="sd-item" onclick="agPickStu(${o.i})"><div class="sd-av" style="background:${o.s.bg};color:${o.s.fg}">${o.s.init}</div><div><div class="sd-nm">${escapeHtml(o.s.name)}</div><div class="sd-em">${escapeHtml(o.s.email)}</div></div></div>`).join('')
+    : `<div class="sd-item" style="cursor:default;color:#aaa">No students match</div>`;
+  dd.classList.add('open');
+}
+function agPickStu(i){ agSelStudentIdx=i; document.getElementById('agStudentInput').value=STUDENTS[i].name; document.getElementById('agStudentDD').classList.remove('open'); }
+document.addEventListener('click', e=>{ if(!e.target.closest('.student-search-wrap')){ const dd=document.getElementById('agStudentDD'); if(dd) dd.classList.remove('open'); } });
+
+function agConfirmCreate(){
+  let idx = agSelStudentIdx;
+  if(idx<0){ const typed=(document.getElementById('agStudentInput').value||'').trim().toLowerCase(); idx=STUDENTS.findIndex(s=>s.name.toLowerCase()===typed); }
+  const id = createTicket({
+    subject: document.getElementById('agSubject').value.trim() || 'New query',
+    studentObj: idx>=0 ? STUDENTS[idx] : STUDENTS[0],
+    category: document.getElementById('agCat').value,
+    priority: document.getElementById('agPri').value,
+    description: document.getElementById('agDesc').value.trim()
+  });
+  agDraftText = '';
+  closeAllRaise();
+  showView('list');
+  showToast('Query ' + id + ' created with FlowAI');
+}
+
+// ══ RAISE FLOW 3: guided chat ══
+let guided = null;
+function setGsProg(p){ document.getElementById('gsProg').style.width = p + '%'; }
+function gsBot(html){ const b=document.getElementById('gsBody'); const d=document.createElement('div'); d.className='gs-msg'; d.innerHTML=`<div class="gsm-av"><svg><use href="#i-zap"/></svg></div><div class="gsm-b">${html}</div>`; b.appendChild(d); b.scrollTop=b.scrollHeight; }
+function gsUser(html){ const b=document.getElementById('gsBody'); const d=document.createElement('div'); d.className='gs-msg user'; d.innerHTML=`<div class="gsm-b">${html}</div>`; b.appendChild(d); b.scrollTop=b.scrollHeight; }
+function gsLive(html, cls){ const ex=document.getElementById('gsLive'); if(ex) ex.remove(); const b=document.getElementById('gsBody'); const d=document.createElement('div'); d.className=cls||'gs-opts'; d.id='gsLive'; d.innerHTML=html; b.appendChild(d); b.scrollTop=b.scrollHeight; }
+function openGuided(){
+  document.getElementById('raiseChooser').classList.remove('show');
+  document.getElementById('agenticModal').classList.remove('show');
+  document.getElementById('raiseOv').classList.add('show');
+  document.getElementById('guidedSheet').classList.add('show');
+  guided = { category:null, priority:null, studentObj:null, reason:'' };
+  document.getElementById('gsBody').innerHTML = '';
+  document.getElementById('gsFoot').style.display = 'none';
+  setGsProg(0);
+  gsBot("Hi! Let's raise this query together. What's it about?");
+  gsCategory();
+}
+function gsCategory(){
+  gsLive(Object.entries(CATEGORIES).map(([k,v])=>`<button class="gs-opt" onclick="gsPickCat('${k}')"><svg><use href="#${CAT_ICONS[k]||'i-message'}"/></svg>${v}</button>`).join(''));
+}
+function gsPickCat(k){ guided.category=k; document.getElementById('gsLive')?.remove(); gsUser(CATEGORIES[k]); setGsProg(25); gsBot('How urgent is it?'); gsPriority(); }
+function gsPriority(){
+  gsLive(['urgent','high','medium','low'].map(p=>`<button class="gs-opt" onclick="gsPickPri('${p}')"><span class="pri-pill ${p}" style="pointer-events:none"><span class="pri-dot"></span>${capitalize(p)}</span></button>`).join(''));
+}
+function gsPickPri(p){ guided.priority=p; document.getElementById('gsLive')?.remove(); gsUser(capitalize(p)); setGsProg(50); gsBot('Which student is this for?'); gsStudent(); }
+function gsStudent(){
+  document.getElementById('gsFoot').style.display='none';
+  gsLive(`<div class="gs-combo">
+      <div class="gs-inrow"><svg style="width:15px;height:15px;stroke:#aaa;fill:none;stroke-width:2;flex-shrink:0"><use href="#i-search"/></svg><input id="gsStuSearch" placeholder="Search student by name or email…" oninput="gsStuRender(this.value)" onfocus="gsStuRender(this.value)" autocomplete="off"></div>
+      <div class="gs-stu-list" id="gsStuList" style="display:none"></div>
+    </div>`, 'gs-stu-wrap');
+}
+function gsStuRender(q){
+  const list=document.getElementById('gsStuList'); if(!list) return;
+  const query=(q||'').toLowerCase();
+  const matches=STUDENTS.filter(s=>s.name.toLowerCase().includes(query)||s.email.toLowerCase().includes(query));
+  list.innerHTML = matches.length
+    ? matches.map(s=>{ const i=STUDENTS.indexOf(s); return `<button class="gs-stu-item" onclick="gsPickStu(${i})"><span class="tk-av" style="background:${s.bg};color:${s.fg}">${s.init}</span><span class="gs-stu-tx"><span class="gs-stu-n">${escapeHtml(s.name)}</span><span class="gs-stu-e">${escapeHtml(s.email)}</span></span></button>`; }).join('')
+    : `<div class="gs-stu-empty" style="padding:10px 12px">No students match “${escapeHtml(q)}”</div>`;
+  list.style.display='flex';
+  document.getElementById('gsBody').scrollTop=document.getElementById('gsBody').scrollHeight;
+}
+document.addEventListener('click', e=>{ if(!e.target.closest('.gs-combo')){ const l=document.getElementById('gsStuList'); if(l) l.style.display='none'; } });
+function gsPickStu(i){ guided.studentObj=STUDENTS[i]; document.getElementById('gsLive')?.remove(); gsUser(escapeHtml(STUDENTS[i].name)); setGsProg(75); gsBot('Got it. Add a one-line summary of the issue.'); gsReason(); }
+function gsReason(){
+  gsLive(['Needs escalation','Deadline approaching','Document issue','Status follow-up'].map(c=>`<button class="gs-opt" onclick="gsPickReason(this.textContent)">${c}</button>`).join(''));
+  const foot=document.getElementById('gsFoot');
+  foot.style.display='block';
+  foot.innerHTML=`<div class="gs-inrow"><input id="gsInput" placeholder="Type a short summary…" onkeydown="if(event.key==='Enter')gsSubmitReason()"><button class="gs-send" onclick="gsSubmitReason()"><svg><use href="#i-send"/></svg></button></div>`;
+}
+function gsSubmitReason(){ const v=document.getElementById('gsInput').value.trim(); if(!v) return; gsPickReason(v); }
+function gsPickReason(txt){
+  guided.reason=txt; document.getElementById('gsLive')?.remove();
+  document.getElementById('gsFoot').style.display='none';
+  gsUser(escapeHtml(txt)); setGsProg(100);
+  gsBot("Here's your query — ready to create:");
+  gsLive(`
+    <div class="gss-row"><span class="gss-k">Student</span><span class="gss-v">${guided.studentObj.name}</span></div>
+    <div class="gss-row"><span class="gss-k">Category</span><span class="gss-v">${CATEGORIES[guided.category]}</span></div>
+    <div class="gss-row"><span class="gss-k">Priority</span><span class="gss-v">${capitalize(guided.priority)}</span></div>
+    <div class="gss-row"><span class="gss-k">Summary</span><span class="gss-v">${escapeHtml(guided.reason)}</span></div>
+    <button class="btn btn-teal" style="width:100%;justify-content:center;margin-top:12px" onclick="gsCreate()"><svg><use href="#i-check"/></svg>Create query</button>
+    <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:4px" onclick="openGuided()">Start over</button>`, 'gs-summary');
+}
+function gsCreate(){
+  const subject = guided.reason.length>60 ? guided.reason.slice(0,60)+'…' : guided.reason;
+  const id = createTicket({ subject, studentObj:guided.studentObj, category:guided.category, priority:guided.priority, description:guided.reason });
+  closeAllRaise();
+  showView('list');
+  showToast('Query ' + id + ' created');
+}
+
+// ── ADD REPLY ──
+function addReply() {
+  const input = document.getElementById('replyInput');
+  const val = input.value.trim();
+  if (!val || !viewingTicket) return;
+  viewingTicket.activity.push({
+    type:'note',
+    text:'<strong>Agent A (You)</strong> added a note',
+    time: 'Apr 29, 12:00 PM',
+    comment: val
+  });
+  input.value = '';
+  renderDetail();
+  showToast('Note added');
+}
+
+// ── RESOLVE ──
+function resolveTicket() {
+  if (!viewingTicket) return;
+  viewingTicket.status = 'resolved';
+  viewingTicket.resolvedAt = '2026-04-29T12:00:00';
+  viewingTicket.activity.push({
+    type:'resolved',
+    text:'<strong>Agent A (You)</strong> marked as resolved',
+    time:'Apr 29, 12:00 PM'
+  });
+  renderDetail();
+  showToast('Ticket marked as resolved');
+}
+
+// ── HELPERS ──
+function formatHours(h) {
+  if (h < 1) return Math.round(h * 60) + 'm';
+  if (h < 24) return Math.round(h * 10) / 10 + 'h';
+  const d = Math.floor(h / 24);
+  const rem = Math.round(h % 24);
+  return d + 'd ' + rem + 'h';
+}
+
+function formatDate(d) {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+}
+
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+function statusLabel(s) {
+  const map = { 'open':'Open','in-progress':'In Progress','awaiting':'Awaiting Response','resolved':'Resolved','closed':'Closed' };
+  return map[s] || s;
+}
+
+function resetForm() {
+  ['ct-subject','ct-student','ct-category','ct-priority','ct-desc'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = '';
+    el.classList.remove('error');
+  });
+  document.getElementById('ct-application').value = '';
+  document.getElementById('slaPreview').classList.remove('show');
+  selectedStudent = null;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── INIT ──
+document.addEventListener('DOMContentLoaded', () => {
+  renderTickets();
+});
+</script>
+</body>
+</html>
